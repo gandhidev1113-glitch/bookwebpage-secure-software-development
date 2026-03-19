@@ -6,6 +6,8 @@ import com.library.model.BorrowRequest.BorrowStatus;
 import com.library.model.User;
 import com.library.repository.BorrowRequestRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 @Service
@@ -15,7 +17,7 @@ public class BorrowService {
     private final BookService bookService;
 
     public BorrowService(BorrowRequestRepository borrowRequestRepository,
-                         BookService bookService) {
+            BookService bookService) {
         this.borrowRequestRepository = borrowRequestRepository;
         this.bookService = bookService;
     }
@@ -47,6 +49,7 @@ public class BorrowService {
         return borrowRequestRepository.save(request);
     }
 
+    @Transactional
     public List<BorrowRequest> getRequestsByUser(User user) {
         return borrowRequestRepository.findByUser(user);
     }

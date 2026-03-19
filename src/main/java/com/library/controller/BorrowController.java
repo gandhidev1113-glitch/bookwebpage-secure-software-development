@@ -38,6 +38,7 @@ public class BorrowController {
     }
 
     @GetMapping("/my-requests")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<BorrowRequest>> myRequests(
             Authentication authentication) {
         User user = userService.findByUsername(authentication.getName());

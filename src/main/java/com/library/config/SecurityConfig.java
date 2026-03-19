@@ -38,13 +38,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/books/add").hasRole("LIBRARIAN")
                         .requestMatchers("/api/books/update/**").hasRole("LIBRARIAN")
                         .requestMatchers("/api/books/delete/**").hasRole("LIBRARIAN")
-                        .requestMatchers("/api/borrow/pending").hasRole("LIBRARIAN") // ← ADD THIS
+                        .requestMatchers("/api/borrow/pending").hasRole("LIBRARIAN")
                         .requestMatchers("/api/borrow/approve/**").hasRole("LIBRARIAN")
                         .requestMatchers("/api/borrow/reject/**").hasRole("LIBRARIAN")
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/v3/api-docs/**").permitAll()
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter,
                         UsernamePasswordAuthenticationFilter.class);
 
