@@ -30,14 +30,19 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers
+                        .frameOptions(frame -> frame.disable()) // 🔥 FIX H2
+                )
                 .sessionManagement(s -> s
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers("/h2-console/**").permitAll() // OK
                         .requestMatchers("/api/books/add").hasRole("LIBRARIAN")
                         .requestMatchers("/api/books/update/**").hasRole("LIBRARIAN")
                         .requestMatchers("/api/books/delete/**").hasRole("LIBRARIAN")
+                        .requestMatchers("/api/borrow/my-requests").hasRole("USER")
                         .requestMatchers("/api/borrow/pending").hasRole("LIBRARIAN")
                         .requestMatchers("/api/borrow/approve/**").hasRole("LIBRARIAN")
                         .requestMatchers("/api/borrow/reject/**").hasRole("LIBRARIAN")

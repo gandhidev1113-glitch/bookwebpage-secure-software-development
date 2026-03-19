@@ -8,7 +8,6 @@ import com.library.model.User;
 import com.library.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -61,6 +60,7 @@ public class AuthController {
                     )
             );
         } catch (BadCredentialsException e) {
+            // Generic message — never reveal if username or password is wrong
             return ResponseEntity.status(401)
                     .body(Map.of("error", "Invalid credentials"));
         }
@@ -70,13 +70,5 @@ public class AuthController {
         String token = jwtService.generateToken(userDetails);
 
         return ResponseEntity.ok(Map.of("token", token));
-    }
-
-    @GetMapping("/me")
-    public ResponseEntity<?> me(Authentication authentication) {
-        return ResponseEntity.ok(Map.of(
-                "username", authentication.getName(),
-                "authorities", authentication.getAuthorities().toString()
-        ));
     }
 }
