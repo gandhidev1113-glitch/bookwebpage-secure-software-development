@@ -1,6 +1,7 @@
 package com.library.controller;
 
 import com.library.config.JwtService;
+import com.library.config.SecurityLogger;
 import com.library.dto.LoginRequest;
 import com.library.dto.RegisterRequest;
 import com.library.model.Role;
@@ -23,13 +24,16 @@ public class AuthController {
     private final UserService userService;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final SecurityLogger securityLogger;
 
     public AuthController(UserService userService,
                           JwtService jwtService,
-                          AuthenticationManager authenticationManager) {
+                          AuthenticationManager authenticationManager,
+                          SecurityLogger securityLogger) {
         this.userService = userService;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
+        this.securityLogger = securityLogger;
     }
 
     @PostMapping("/register")
@@ -44,6 +48,7 @@ public class AuthController {
                 request.getPassword(),
                 role
         );
+        securityLogger.logRegistration(user.getUsername(), user.getRole().name());
         return ResponseEntity.ok(Map.of(
                 "message", "User registered successfully",
                 "username", user.getUsername(),
@@ -61,6 +66,7 @@ public class AuthController {
                     )
             );
         } catch (BadCredentialsException e) {
+            securityLogger.logFailedLogin(request.getUsername());
             return ResponseEntity.status(401)
                     .body(Map.of("error", "Invalid credentials"));
         }
@@ -68,6 +74,7 @@ public class AuthController {
         UserDetails userDetails =
                 userService.loadUserByUsername(request.getUsername());
         String token = jwtService.generateToken(userDetails);
+        securityLogger.logLogin(request.getUsername());
 
         return ResponseEntity.ok(Map.of("token", token));
     }

@@ -7,7 +7,6 @@ import com.library.model.User;
 import com.library.repository.BorrowRequestRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 
 @Service
@@ -17,11 +16,12 @@ public class BorrowService {
     private final BookService bookService;
 
     public BorrowService(BorrowRequestRepository borrowRequestRepository,
-            BookService bookService) {
+                         BookService bookService) {
         this.borrowRequestRepository = borrowRequestRepository;
         this.bookService = bookService;
     }
 
+    @Transactional
     public BorrowRequest requestBorrow(User user, Long bookId) {
         Book book = bookService.getBookById(bookId);
 
@@ -36,20 +36,21 @@ public class BorrowService {
         return borrowRequestRepository.save(request);
     }
 
+    @Transactional
     public BorrowRequest approveRequest(Long requestId) {
         BorrowRequest request = getRequestById(requestId);
         request.setStatus(BorrowStatus.APPROVED);
-        request.getBook().setAvailable(false); // Mark book as unavailable
+        request.getBook().setAvailable(false);
         return borrowRequestRepository.save(request);
     }
 
+    @Transactional
     public BorrowRequest rejectRequest(Long requestId) {
         BorrowRequest request = getRequestById(requestId);
         request.setStatus(BorrowStatus.REJECTED);
         return borrowRequestRepository.save(request);
     }
 
-    @Transactional
     public List<BorrowRequest> getRequestsByUser(User user) {
         return borrowRequestRepository.findByUser(user);
     }
