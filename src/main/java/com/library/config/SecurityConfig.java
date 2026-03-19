@@ -13,6 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.context.annotation.Lazy;
 
 @Configuration
 @EnableWebSecurity
@@ -21,7 +22,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter) {
+    public SecurityConfig(@Lazy JwtAuthenticationFilter jwtAuthFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
     }
 
@@ -37,8 +38,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/books/add").hasRole("LIBRARIAN")
                         .requestMatchers("/api/books/update/**").hasRole("LIBRARIAN")
                         .requestMatchers("/api/books/delete/**").hasRole("LIBRARIAN")
+                        .requestMatchers("/api/borrow/pending").hasRole("LIBRARIAN") // ← ADD THIS
                         .requestMatchers("/api/borrow/approve/**").hasRole("LIBRARIAN")
                         .requestMatchers("/api/borrow/reject/**").hasRole("LIBRARIAN")
+                        .requestMatchers("/swagger-ui/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter,
