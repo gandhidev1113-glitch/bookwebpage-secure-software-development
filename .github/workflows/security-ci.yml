@@ -120,7 +120,7 @@ jobs:
       - name: Run ZAP Baseline Scan
         run: |
           docker run --rm --network host \
-            --user "$(id -u):$(id -g)" \
+            --user 0:0 \
             -e HOME=/zap/wrk \
             -w /zap/wrk \
             -v "${PWD}:/zap/wrk/:rw" \
