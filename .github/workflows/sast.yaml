@@ -1,0 +1,43 @@
+name: SAST Scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  sast:
+    name: Run SAST with SonarCloud
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Récupérer le code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Installer Java
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 3. Cache Maven (accélère le build)
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # 4. Build du projet
+      - name: Build with Maven
+        run: mvn clean install -DskipTests
+
+      # 5. Scan SonarCloud
+      - name: Run SonarCloud analysis
+        run: mvn sonar:sonar \
+          -Dsonar.projectKey=sofienefenniche123 \
+          -Dsonar.organization=sofienefenniche123 \
+          -Dsonar.host.url=https://sonarcloud.io \
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
