@@ -5,15 +5,18 @@ import com.library.model.BorrowRequest;
 import com.library.model.User;
 import com.library.service.BorrowService;
 import com.library.service.UserService;
+import jakarta.validation.constraints.Positive;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/borrow")
+@Validated
 public class BorrowController {
 
     private final BorrowService borrowService;
@@ -29,7 +32,7 @@ public class BorrowController {
     }
 
     @PostMapping("/request/{bookId}")
-    public ResponseEntity<?> requestBorrow(@PathVariable Long bookId,
+    public ResponseEntity<?> requestBorrow(@PathVariable @Positive Long bookId,
                                            Authentication authentication) {
         User user = userService.findByUsername(authentication.getName());
         BorrowRequest request = borrowService.requestBorrow(user, bookId);
@@ -56,7 +59,7 @@ public class BorrowController {
 
     @PutMapping("/approve/{requestId}")
     @PreAuthorize("hasAuthority('ROLE_LIBRARIAN')")
-    public ResponseEntity<?> approve(@PathVariable Long requestId,
+    public ResponseEntity<?> approve(@PathVariable @Positive Long requestId,
                                      Authentication authentication) {
         BorrowRequest request = borrowService.approveRequest(requestId);
         securityLogger.logBorrowApproved(authentication.getName(), requestId);
@@ -69,7 +72,7 @@ public class BorrowController {
 
     @PutMapping("/reject/{requestId}")
     @PreAuthorize("hasAuthority('ROLE_LIBRARIAN')")
-    public ResponseEntity<?> reject(@PathVariable Long requestId,
+    public ResponseEntity<?> reject(@PathVariable @Positive Long requestId,
                                     Authentication authentication) {
         BorrowRequest request = borrowService.rejectRequest(requestId);
         securityLogger.logBorrowRejected(authentication.getName(), requestId);

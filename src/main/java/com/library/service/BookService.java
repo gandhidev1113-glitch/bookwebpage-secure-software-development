@@ -40,7 +40,6 @@ public class BookService {
         existing.setTitle(updated.getTitle());
         existing.setAuthor(updated.getAuthor());
         existing.setCategory(updated.getCategory());
-        existing.setAvailable(updated.isAvailable());
         return bookRepository.save(existing);
     }
 

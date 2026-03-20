@@ -1,149 +1,185 @@
-# bookwebpage-secure-software-development
+# Secure Library Management API
 
-# 🔐 Book Webpage — Secure Software Development
+Secure mini web application project for the **Secure Software Development** module.
+This repository implements a REST API for a library system with security controls integrated into the codebase.
 
-## 📌 Project Overview
+## Project Scope
 
-This project is a secure web application developed as part of a **Secure Software Development** course.
-It focuses on identifying, exploiting, and mitigating common web vulnerabilities following the **OWASP Top 10**.
+### Functional features
+- User registration and login
+- Two roles: `USER` and `LIBRARIAN`
+- List books and search by title or category
+- User borrow request flow
+- Librarian add/update/delete books
+- Librarian approve/reject borrow requests
 
-The project is built collaboratively, emphasizing **secure coding practices, team workflow, and application security testing**.
+### Security features implemented
+- BCrypt password hashing
+- JWT authentication and role-based authorization
+- Input validation on request body and key path/query parameters
+- Global exception handling with sanitized API error responses
+- Custom `401/403` handlers for consistent REST security responses
+- No hardcoded JWT/bootstrap token in source code (environment-based config)
+- Security logging for auth and librarian operations
+- Safe bootstrap mechanism for first librarian account
 
----
+## Tech Stack
+- Java 17+
+- Spring Boot 3
+- Spring Security
+- Spring Data JPA
+- H2 Database
+- Maven
+- OpenAPI (Swagger UI)
 
-## 🎯 Objectives
+## Run Locally
 
-* Identify real-world security vulnerabilities
-* Perform controlled exploitation (OWASP Juice Shop)
-* Apply secure coding techniques
-* Implement secure API design principles
-* Collaborate using Git and GitHub workflow
+### Prerequisites
+- JDK 17 or newer
+- Maven (or use `./mvnw`)
+- `uv`/`uvx` (for local Semgrep execution)
+- Docker (for local OWASP ZAP baseline scan)
 
----
+### Environment variables
+- `JWT_SECRET` (recommended in production)
+- `JWT_EXPIRATION` (optional, default `86400000`)
+- `LIBRARIAN_BOOTSTRAP_TOKEN` (needed for first librarian bootstrap)
+- `DB_USERNAME` (optional, default `sa`)
+- `DB_PASSWORD` (optional, default empty)
+- `H2_CONSOLE_ENABLED` (optional, default `false`)
 
-## 👥 Team Collaboration
-
-This project is developed in a team environment using GitHub:
-
-* Feature-based branching (`feature/*`)
-* Pull Requests for code review
-* Continuous updates via `git pull`
-* Secure and clean commit practices
-
----
-
-## 🧪 Security Findings
-
-### 🔓 1. Broken Access Control (IDOR)
-
-* Access to other users’ data by modifying IDs
-* Missing server-side ownership checks
-
-### 💉 2. SQL Injection (Authentication Bypass)
-
-* Payload: `' OR 1=1--`
-* Result: Unauthorized admin access
-
-### ⚡ 3. DOM-Based XSS
-
-* Injection via URL (`location.hash`)
-* JavaScript execution in browser context
-
----
-
-## 🛠️ OWASP Top 10 Mapping
-
-| Vulnerability | OWASP Category             |
-| ------------- | -------------------------- |
-| IDOR          | A01: Broken Access Control |
-| SQL Injection | A03: Injection             |
-| XSS           | A03: Injection             |
-
----
-
-## 🔐 Secure Coding Improvements
-
-* ✅ Parameterized queries (SQL Injection prevention)
-* ✅ Server-side authorization checks (IDOR protection)
-* ✅ Output encoding (XSS prevention)
-* ✅ Avoid `innerHTML` with untrusted input
-* ✅ CSRF protection (tokens + origin validation)
-* ✅ SSRF protection (URL validation + allowlisting)
-
----
-
-## 🌐 Secure API Design
-
-### Example Endpoint
-
-`GET /api/users/{id}/orders`
-
-### Security Controls
-
-* Authentication (JWT validation)
-* Authorization (RBAC + ownership checks)
-* Deny-by-default access model
-* Input validation (strict schema)
-* Data minimization (DTOs)
-* Rate limiting & abuse prevention
-* Logging & monitoring
-
----
-
-## ⚙️ Tech & Tools
-
-* OWASP Juice Shop
-* JavaScript / Node.js
-* Git & GitHub
-* Browser DevTools
-* OWASP Top 10 Framework
-
----
-
-## 🧠 Key Takeaways
-
-* Never trust client input
-* Always enforce server-side security
-* Authentication ≠ Authorization
-* Use secure defaults (deny-by-default)
-* Protect sensitive data (tokens, passwords)
-* Apply security early (Shift Left)
-
----
-
-## 🚀 Getting Started
+### Start the app
 
 ```bash
-git clone https://github.com/gandhidev1113-glitch/bookwebpage-secure-software-development.git
-cd bookwebpage-secure-software-development
-git pull origin main
+cd /Users/dtbao4597/esilv/secure-sofware-dev/bookwebpage-secure-software-development
+export JWT_SECRET="$(openssl rand -base64 32)"
+export LIBRARIAN_BOOTSTRAP_TOKEN="$(openssl rand -base64 32)"
+./mvnw spring-boot:run
 ```
 
----
+Swagger UI:
+- `http://127.0.0.1:8080/swagger-ui/index.html`
 
-## 🔄 Workflow
+## Accounts and Roles
+
+No hardcoded default accounts are shipped.
+
+### Create first librarian (one-time bootstrap)
 
 ```bash
-git checkout -b feature/your-feature-name
-git add .
-git commit -m "Your message"
-git push origin feature/your-feature-name
+curl -X POST http://127.0.0.1:8080/api/auth/register-librarian \
+  -H "Content-Type: application/json" \
+  -H "X-Setup-Token: $LIBRARIAN_BOOTSTRAP_TOKEN" \
+  -d '{"username":"admin1","email":"admin1@lib.com","password":"StrongPass123"}'
 ```
 
-Create a Pull Request for review.
+### Create normal user
 
----
+```bash
+curl -X POST http://127.0.0.1:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user1","email":"user1@lib.com","password":"StrongPass123"}'
+```
 
-## 👤 Contributors
+### Create additional librarians
+After login as a librarian, call:
+- `POST /api/auth/create-librarian` with `Authorization: Bearer <token>`
 
-**Devkumar Parikshit GANDHI**
-**Thai Bao DUONG**
-**Sofyen FENICH**
-**Arthur Amuda**
+## Key API Endpoints
 
+### Auth
+- `POST /api/auth/register`
+- `POST /api/auth/register-librarian`
+- `POST /api/auth/create-librarian` (librarian only)
+- `POST /api/auth/login`
+- `GET /api/auth/me`
 
----
+### Books
+- `GET /api/books`
+- `GET /api/books/{id}`
+- `GET /api/books/search?title=...&category=...`
+- `POST /api/books/add` (librarian)
+- `PUT /api/books/update/{id}` (librarian)
+- `DELETE /api/books/delete/{id}` (librarian)
 
-## 📜 License
+### Borrow
+- `POST /api/borrow/request/{bookId}`
+- `GET /api/borrow/my-requests`
+- `GET /api/borrow/pending` (librarian)
+- `PUT /api/borrow/approve/{requestId}` (librarian)
+- `PUT /api/borrow/reject/{requestId}` (librarian)
 
-This project is for academic and educational purposes only.
+## Test and Build
+
+```bash
+./mvnw -q -DskipTests compile
+./mvnw -q test
+```
+
+## Security Testing (SAST/DAST)
+
+### SAST (Semgrep) - local run
+
+```bash
+cd /Users/dtbao4597/esilv/secure-sofware-dev/bookwebpage-secure-software-development
+uvx semgrep scan \
+  --config p/owasp-top-ten \
+  --config p/java \
+  --config p/security-audit \
+  --exclude zap-report.html \
+  --exclude target \
+  --exclude "*.db" \
+  --json --output semgrep-report.json \
+  src
+```
+
+### DAST (OWASP ZAP Baseline) - local run
+
+```bash
+cd /Users/dtbao4597/esilv/secure-sofware-dev/bookwebpage-secure-software-development
+docker run --rm \
+  -v "${PWD}:/zap/wrk/:rw" \
+  ghcr.io/zaproxy/zaproxy:stable \
+  zap-baseline.py \
+  -t http://host.docker.internal:8080 \
+  -r zap-report.html \
+  -J zap-report.json \
+  -m 2
+```
+
+### Latest executed results (March 20, 2026)
+
+- SAST (Semgrep): `0 findings` on source code scan
+- DAST (OWASP ZAP Baseline): `FAIL-NEW: 0`, `WARN-NEW: 1`
+- Remaining DAST warning context:
+  - `Non-Storable Content` on endpoints returning `401 Unauthorized`
+  - Spider warning (`expected 200, got 401`) due to protected routes
+  - Interpreted as expected/low-priority behavior under deny-by-default access control
+
+### Security scan artifacts
+
+- `semgrep-report.json`
+- `zap-report.json`
+- `zap-report.html`
+
+## CI/CD Security Draft
+
+Workflow file:
+- `.github/workflows/security-ci.yml`
+
+Pipeline stages included:
+- push/PR trigger
+- build + test
+- SAST (Semgrep)
+- optional dependency/container scan (Trivy)
+- DAST baseline scan (OWASP ZAP against local app)
+- security gate decision (pass/fail based on previous stages)
+
+## Contributors
+- Devkumar Parikshit GANDHI
+- Thai Bao DUONG
+- Sofyen FENICH
+- Arthur Amuda
+
+## License
+Academic and educational use.
