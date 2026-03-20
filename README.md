@@ -175,6 +175,10 @@ Pipeline stages included:
 - consolidated security summary artifact
 - security gate decision (pass/fail based on previous stages)
 
+Execution note:
+- SonarCloud job is executed on `push` / `workflow_dispatch`.
+- On `pull_request`, Sonar job is skipped to avoid bootstrap/default-branch failure before initial Sonar project setup.
+
 Required GitHub configuration for SonarCloud:
 - Secret: `SONAR_TOKEN`
 - Optional repository variable override: `SONAR_PROJECT_KEY`

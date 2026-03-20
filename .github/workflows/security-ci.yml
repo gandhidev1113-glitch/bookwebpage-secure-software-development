@@ -53,6 +53,7 @@ jobs:
     name: SAST (SonarCloud)
     runs-on: ubuntu-latest
     needs: build_test
+    if: github.event_name != 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -244,7 +245,7 @@ jobs:
           echo "dast_zap=${{ needs.dast_zap.result }}"
 
           if [ "${{ needs.build_test.result }}" != "success" ] || \
-             [ "${{ needs.sast_sonarcloud.result }}" != "success" ] || \
+             { [ "${{ needs.sast_sonarcloud.result }}" != "success" ] && [ "${{ needs.sast_sonarcloud.result }}" != "skipped" ]; } || \
              [ "${{ needs.dast_zap.result }}" != "success" ]; then
             echo "Security gate failed"
             exit 1
