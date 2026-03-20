@@ -1,0 +1,52 @@
+name: DAST Scan
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  dast:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Setup Java
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 3. Build project
+      - name: Build project
+        run: mvn clean package -DskipTests
+
+      # 4. Run application
+      - name: Run application
+        run: |
+          nohup java -jar target/*.jar &
+          sleep 25
+
+      # 5. Run OWASP ZAP manually (NO BUG)
+      - name: Run OWASP ZAP scan
+        run: |
+          docker run --user root --network=host \
+          -v $(pwd):/zap/wrk/:rw \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py -t http://localhost:8080 \
+          -I \
+          -J report_json.json -w report_md.md -r report_html.html || true
+
+      # 6. (Optional) Upload report
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: report_html.html
