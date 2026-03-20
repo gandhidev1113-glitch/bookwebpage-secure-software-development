@@ -54,6 +54,10 @@ public class UserService implements UserDetailsService {
         return userRepository.save(user);
     }
 
+    public boolean hasAnyLibrarian() {
+        return userRepository.existsByRole(Role.LIBRARIAN);
+    }
+
     public User findByUsername(String username) {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException(

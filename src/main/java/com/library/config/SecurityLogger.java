@@ -21,6 +21,10 @@ public class SecurityLogger {
         log.info("[AUTH] New user registered: {} with role: {}", username, role);
     }
 
+    public void logFailedLibrarianBootstrap(String username) {
+        log.warn("[AUTH] Failed librarian bootstrap attempt for: {}", username);
+    }
+
     public void logBookAdded(String username, String title) {
         log.info("[ADMIN] Book added by {}: {}", username, title);
     }

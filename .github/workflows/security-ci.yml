@@ -1,0 +1,167 @@
+name: Security CI/CD Draft
+
+on:
+  push:
+    branches:
+      - main
+      - feature/**
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build_test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Compile
+        run: ./mvnw -q -DskipTests compile
+
+      - name: Test
+        run: ./mvnw -q test
+
+  sast_semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Semgrep
+        run: python -m pip install --upgrade pip semgrep
+
+      - name: Run Semgrep
+        run: |
+          semgrep scan \
+            --config p/owasp-top-ten \
+            --error \
+            --json \
+            --output semgrep-report.json \
+            .
+
+      - name: Upload Semgrep Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: semgrep-report.json
+
+  dependency_scan:
+    name: Optional Dependency/Container Scan (Trivy)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy FS Scan
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.34.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: '0'
+          severity: CRITICAL,HIGH,MEDIUM
+          version: v0.68.1
+          token-setup-trivy: ${{ github.token }}
+
+  dast_zap:
+    name: DAST (OWASP ZAP Baseline)
+    runs-on: ubuntu-latest
+    needs: build_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Start Application
+        run: |
+          export JWT_SECRET="$(openssl rand -base64 32)"
+          export LIBRARIAN_BOOTSTRAP_TOKEN="ci-bootstrap-token"
+          nohup ./mvnw -q spring-boot:run > app.log 2>&1 &
+
+      - name: Wait for Application
+        run: |
+          for i in {1..60}; do
+            if curl -sSf http://127.0.0.1:8080/v3/api-docs >/dev/null; then
+              echo "Application is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Application did not start in time"
+          exit 1
+
+      - name: Run ZAP Baseline Scan
+        run: |
+          docker run --rm --network host \
+            --user 0:0 \
+            -e HOME=/zap/wrk \
+            -w /zap/wrk \
+            -v "${PWD}:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://127.0.0.1:8080 \
+            -r zap-report.html \
+            -J zap-report.json \
+            -I \
+            -m 2
+
+      - name: Upload ZAP Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: |
+            zap-report.html
+            zap-report.json
+            app.log
+
+  security_gate:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    needs:
+      - build_test
+      - sast_semgrep
+      - dast_zap
+    if: always()
+    steps:
+      - name: Evaluate Gate
+        run: |
+          echo "build_test=${{ needs.build_test.result }}"
+          echo "sast_semgrep=${{ needs.sast_semgrep.result }}"
+          echo "dast_zap=${{ needs.dast_zap.result }}"
+
+          if [ "${{ needs.build_test.result }}" != "success" ] || \
+             [ "${{ needs.sast_semgrep.result }}" != "success" ] || \
+             [ "${{ needs.dast_zap.result }}" != "success" ]; then
+            echo "Security gate failed"
+            exit 1
+          fi
+
+          echo "Security gate passed"
