@@ -177,8 +177,12 @@ Pipeline stages included:
 
 Required GitHub configuration for SonarCloud:
 - Secret: `SONAR_TOKEN`
-- Repository variable: `SONAR_PROJECT_KEY`
-- Repository variable: `SONAR_ORGANIZATION`
+- Optional repository variable override: `SONAR_PROJECT_KEY`
+- Optional repository variable override: `SONAR_ORGANIZATION`
+
+Workflow defaults (used if variables are not set):
+- `SONAR_PROJECT_KEY_DEFAULT=sofienefenniche123_Security_web`
+- `SONAR_ORGANIZATION_DEFAULT=sofienefenniche123`
 
 CI artifacts generated:
 - `build-test-report`

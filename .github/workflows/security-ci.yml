@@ -16,6 +16,8 @@ permissions:
 env:
   JAVA_VERSION: '17'
   APP_URL: http://127.0.0.1:8080
+  SONAR_PROJECT_KEY_DEFAULT: sofienefenniche123_Security_web
+  SONAR_ORGANIZATION_DEFAULT: sofienefenniche123
 
 jobs:
   build_test:
@@ -67,20 +69,26 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
           SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY_DEFAULT: ${{ env.SONAR_PROJECT_KEY_DEFAULT }}
+          SONAR_ORGANIZATION_DEFAULT: ${{ env.SONAR_ORGANIZATION_DEFAULT }}
         run: |
+          EFFECTIVE_PROJECT_KEY="${SONAR_PROJECT_KEY:-$SONAR_PROJECT_KEY_DEFAULT}"
+          EFFECTIVE_ORGANIZATION="${SONAR_ORGANIZATION:-$SONAR_ORGANIZATION_DEFAULT}"
           test -n "$SONAR_TOKEN" || { echo "Missing secret SONAR_TOKEN"; exit 1; }
-          test -n "$SONAR_PROJECT_KEY" || { echo "Missing repo variable SONAR_PROJECT_KEY"; exit 1; }
-          test -n "$SONAR_ORGANIZATION" || { echo "Missing repo variable SONAR_ORGANIZATION"; exit 1; }
+          test -n "$EFFECTIVE_PROJECT_KEY" || { echo "Missing Sonar project key"; exit 1; }
+          test -n "$EFFECTIVE_ORGANIZATION" || { echo "Missing Sonar organization"; exit 1; }
+          echo "SONAR_PROJECT_KEY_EFFECTIVE=$EFFECTIVE_PROJECT_KEY" >> "$GITHUB_ENV"
+          echo "SONAR_ORGANIZATION_EFFECTIVE=$EFFECTIVE_ORGANIZATION" >> "$GITHUB_ENV"
 
       - name: Build and Run SonarCloud Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
-          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY_EFFECTIVE: ${{ env.SONAR_PROJECT_KEY_EFFECTIVE }}
+          SONAR_ORGANIZATION_EFFECTIVE: ${{ env.SONAR_ORGANIZATION_EFFECTIVE }}
         run: |
           ./mvnw -B -DskipTests verify sonar:sonar \
-            -Dsonar.projectKey="${SONAR_PROJECT_KEY}" \
-            -Dsonar.organization="${SONAR_ORGANIZATION}" \
+            -Dsonar.projectKey="${SONAR_PROJECT_KEY_EFFECTIVE}" \
+            -Dsonar.organization="${SONAR_ORGANIZATION_EFFECTIVE}" \
             -Dsonar.host.url="https://sonarcloud.io" \
             -Dsonar.token="${SONAR_TOKEN}" \
             -Dsonar.qualitygate.wait=true
@@ -88,7 +96,7 @@ jobs:
       - name: Prepare Sonar Metadata
         if: always()
         env:
-          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SONAR_PROJECT_KEY_EFFECTIVE: ${{ env.SONAR_PROJECT_KEY_EFFECTIVE }}
         run: |
           mkdir -p reports
           TASK_FILE="$(find . -type f -name report-task.txt | head -n 1 || true)"
@@ -104,7 +112,7 @@ jobs:
               echo "report-task.txt not found"
               echo
             fi
-            echo "dashboard_url=https://sonarcloud.io/dashboard?id=${SONAR_PROJECT_KEY}"
+            echo "dashboard_url=https://sonarcloud.io/dashboard?id=${SONAR_PROJECT_KEY_EFFECTIVE}"
           } > reports/sonar-report.txt
 
       - name: Upload Sonar Report
