@@ -170,10 +170,21 @@ Workflow file:
 Pipeline stages included:
 - push/PR trigger
 - build + test
-- SAST (Semgrep)
-- optional dependency/container scan (Trivy)
+- SAST (SonarCloud with Quality Gate wait)
 - DAST baseline scan (OWASP ZAP against local app)
+- consolidated security summary artifact
 - security gate decision (pass/fail based on previous stages)
+
+Required GitHub configuration for SonarCloud:
+- Secret: `SONAR_TOKEN`
+- Repository variable: `SONAR_PROJECT_KEY`
+- Repository variable: `SONAR_ORGANIZATION`
+
+CI artifacts generated:
+- `build-test-report`
+- `sonar-report`
+- `zap-report`
+- `security-summary`
 
 ## Contributors
 - Devkumar Parikshit GANDHI
