@@ -73,7 +73,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy FS Scan
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: fs
           scan-ref: .
@@ -117,12 +117,14 @@ jobs:
       - name: Run ZAP Baseline Scan
         run: |
           docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
             -v "${PWD}:/zap/wrk/:rw" \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t http://127.0.0.1:8080 \
             -r zap-report.html \
             -J zap-report.json \
+            -I \
             -m 2
 
       - name: Upload ZAP Reports
