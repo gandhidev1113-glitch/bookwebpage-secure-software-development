@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - sofyen-fenich/all
+  pull_request:
+    branches:
+      - main
+      - sofyen-fenich/all
 permissions:
   contents: read
 
@@ -26,13 +30,27 @@ jobs:
 
       # 3. Build project
       - name: Build project
-        run: mvn clean package -DskipTests
+        run: ./mvnw clean package -DskipTests
+
+      # 3.1 Run tests
+      - name: Run unit tests
+        run: ./mvnw -B test
 
       # 4. Run application
       - name: Run application
         run: |
-          nohup java -jar target/*.jar &
-          sleep 25
+          nohup java -jar target/*.jar > app.log 2>&1 &
+          echo $! > app.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8080/swagger-ui/index.html >/dev/null 2>&1; then
+              echo "Application is up."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Application did not start in time."
+          tail -n 200 app.log || true
+          exit 1
 
       # 5. Run OWASP ZAP manually (NO BUG)
       - name: Run OWASP ZAP scan
@@ -42,11 +60,73 @@ jobs:
           ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py -t http://localhost:8080 \
           -I \
-          -J report_json.json -w report_md.md -r report_html.html || true
+          -J report_json.json -w report_md.md -r report_html.html
+
+      # 5.1 Security gate decision from DAST results
+      - name: Enforce DAST gate (fail on Medium/High)
+        run: |
+          REPORT_FILE="report_json.json"
+          if [ ! -f "$REPORT_FILE" ] && [ -f "$GITHUB_WORKSPACE/report_json.json" ]; then
+            REPORT_FILE="$GITHUB_WORKSPACE/report_json.json"
+          fi
+
+          if [ ! -f "$REPORT_FILE" ]; then
+            echo "Could not find ZAP JSON report file."
+            ls -la
+            exit 1
+          fi
+
+          python3 - "$REPORT_FILE" <<'PY'
+          import json
+          import sys
+
+          report_path = sys.argv[1]
+          with open(report_path, "r", encoding="utf-8") as f:
+              report = json.load(f)
+
+          counts = {"0": 0, "1": 0, "2": 0, "3": 0}
+          for site in report.get("site", []):
+              for alert in site.get("alerts", []):
+                  risk = str(alert.get("riskcode", "0"))
+                  counts[risk] = counts.get(risk, 0) + 1
+
+          print(f"DAST summary -> Info:{counts.get('0', 0)} Low:{counts.get('1', 0)} Medium:{counts.get('2', 0)} High:{counts.get('3', 0)}")
+
+          if counts.get("2", 0) > 0 or counts.get("3", 0) > 0:
+              print("DAST gate failed: Medium/High alerts detected.")
+              sys.exit(1)
+
+          print("DAST gate passed: no Medium/High alerts.")
+          PY
 
       # 6. (Optional) Upload report
       - name: Upload ZAP report
+        if: ${{ always() && env.ACT != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: zap-report
-          path: report_html.html
+          path: report_*.*
+
+      - name: Stop application
+        if: always()
+        run: |
+          if [ -f app.pid ]; then
+            kill "$(cat app.pid)" || true
+          fi
+
+  security_gate:
+    name: DAST Pipeline Gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - dast
+
+    steps:
+      - name: Decide pass/fail
+        run: |
+          echo "dast=${{ needs.dast.result }}"
+          if [ "${{ needs.dast.result }}" != "success" ]; then
+            echo "DAST stage failed -> gate FAIL"
+            exit 1
+          fi
+          echo "DAST gate PASS"
