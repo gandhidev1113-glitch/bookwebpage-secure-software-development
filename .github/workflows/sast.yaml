@@ -6,6 +6,12 @@ on:
       - main
       - sofyen-fenich/all
   pull_request:
+    branches:
+      - main
+      - sofyen-fenich/all
+
+permissions:
+  contents: read
 
 jobs:
   sast:
@@ -30,7 +36,72 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
 
       - name: Build with Maven
-        run: mvn clean install -DskipTests
+        run: ./mvnw clean install -DskipTests
+
+      - name: Run unit tests
+        run: ./mvnw -B test
 
       - name: Run SonarCloud analysis
-        run: mvn sonar:sonar -Dsonar.projectKey=gandhidev1113-glitch_bookwebpage-secure-software-development -Dsonar.organization=gandhidev1113-glitch -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+        if: ${{ env.ACT != 'true' }}
+        run: ./mvnw sonar:sonar -Dsonar.projectKey=gandhidev1113-glitch_bookwebpage-secure-software-development -Dsonar.organization=gandhidev1113-glitch -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=${{ secrets.SONAR_TOKEN }} -Dsonar.qualitygate.wait=true
+
+      - name: Skip SonarCloud on local act
+        if: ${{ env.ACT == 'true' }}
+        run: echo "Running under act=true, SonarCloud step skipped in local simulation."
+
+  dependency_scan:
+    name: Optional Dependency Scan (Trivy FS)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    needs: sast
+
+    steps:
+      - name: Skip dependency scan on local act
+        if: ${{ env.ACT == 'true' }}
+        run: echo "Skipping optional dependency scan while running under act=true."
+
+      - name: Checkout code
+        if: ${{ env.ACT != 'true' }}
+        uses: actions/checkout@v3
+
+      - name: Run Trivy filesystem scan
+        if: ${{ env.ACT != 'true' }}
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: fs
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          format: table
+          output: trivy-fs-report.txt
+
+      - name: Upload Trivy report
+        if: ${{ always() && env.ACT != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-fs-report
+          path: trivy-fs-report.txt
+
+  security_gate:
+    name: SAST Pipeline Gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - sast
+      - dependency_scan
+
+    steps:
+      - name: Decide pass/fail
+        run: |
+          echo "sast=${{ needs.sast.result }}"
+          echo "dependency_scan=${{ needs.dependency_scan.result }} (optional)"
+
+          if [ "${{ needs.sast.result }}" != "success" ]; then
+            echo "SAST stage failed -> gate FAIL"
+            exit 1
+          fi
+
+          if [ "${{ needs.dependency_scan.result }}" = "failure" ]; then
+            echo "::warning::Optional dependency scan failed. Review findings before release."
+          fi
+
+          echo "SAST gate PASS"
