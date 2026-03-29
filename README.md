@@ -34,7 +34,7 @@ Security was considered throughout the project lifecycle rather than added at th
 - Sanitized exception handling
 - Security event logging
 - Static and dynamic security testing
-- CI/CD security gate proposal
+- CI/CD security gates in GitHub Actions
 
 The design goal was to keep the application simple, clear, and secure by default.
 
@@ -53,6 +53,12 @@ The application threat model was built using the STRIDE methodology to identify 
 
 This threat model guided secure coding decisions and helped prioritize the most important controls before testing. The STRIDE analysis was also used as the basis for the formal threat modeling section in the accompanying security report deliverable.
 
+## Security Artifacts
+
+- DFD source: `docs/dfd-current-code.mmd`
+- DFD image: `docs/dfd-current-code.png`
+- Report source (LaTeX): `security_report.tex`
+
 ## Tech Stack
 - Java 17+
 - Spring Boot 3
@@ -67,7 +73,8 @@ This threat model guided secure coding decisions and helped prioritize the most 
 ### Prerequisites
 - JDK 17 or newer
 - Maven (or use `./mvnw`)
-- `uv`/`uvx` (for local Semgrep execution)
+- SonarCloud token (optional for local Sonar run)
+- `uv`/`uvx` (optional, for supplementary local Semgrep execution)
 - Docker (for local OWASP ZAP baseline scan)
 
 ### Environment variables
@@ -77,6 +84,7 @@ This threat model guided secure coding decisions and helped prioritize the most 
 - `DB_USERNAME` (optional, default `sa`)
 - `DB_PASSWORD` (optional, default empty)
 - `H2_CONSOLE_ENABLED` (optional, default `false`)
+- `SONAR_TOKEN` (optional, only needed if running SonarCloud scan locally)
 
 Example environment configuration is provided in `.env.example` for safe local setup without exposing secrets.
 Environment configuration template:
@@ -157,7 +165,25 @@ After login as a librarian, call:
 
 ## Security Testing (SAST/DAST)
 
-### SAST (Semgrep) - local run
+### SAST strategy
+- Primary SAST: **SonarCloud** (enforced in CI via `.github/workflows/sast.yaml`)
+- Supplementary local SAST: **Semgrep** (fast pre-check before push)
+
+### SAST (SonarCloud) - CI required
+SonarCloud is executed in CI and is used as the required SAST gate (`sonar.qualitygate.wait=true`).
+
+### SAST (SonarCloud) - local run (optional)
+
+```bash
+cd /Users/dtbao4597/esilv/secure-sofware-dev/bookwebpage-secure-software-development
+./mvnw sonar:sonar \
+  -Dsonar.projectKey=gandhidev1113-glitch_bookwebpage-secure-software-development \
+  -Dsonar.organization=gandhidev1113-glitch \
+  -Dsonar.host.url=https://sonarcloud.io \
+  -Dsonar.login="$SONAR_TOKEN"
+```
+
+### SAST (Semgrep) - supplementary local run
 
 ```bash
 cd /Users/dtbao4597/esilv/secure-sofware-dev/bookwebpage-secure-software-development
@@ -186,38 +212,47 @@ docker run --rm \
   -m 2
 ```
 
-### Latest executed results (March 20, 2026)
+### Latest executed results (March 29, 2026)
 
 ### Security Testing Summary
 Static (SAST) and dynamic (DAST) analysis were executed after implementing authentication, authorization, and validation controls to verify that no critical vulnerabilities remained in the application.
 
-- SAST (Semgrep): `0 findings` on source code scan
-- DAST (OWASP ZAP Baseline): `FAIL-NEW: 0`, `WARN-NEW: 1`
-- Remaining DAST warning context:
-  - `Non-Storable Content` on endpoints returning `401 Unauthorized`
-  - Spider warning (`expected 200, got 401`) due to protected routes
-  - Interpreted as expected/low-priority behavior under deny-by-default access control
+- SAST (primary, CI): SonarCloud quality gate is the required SAST gate in workflow
+- SAST (supplementary, local Semgrep): `0 findings` (`semgrep-report.json`, `semgrep-after-custom.json`)
+- DAST (OWASP ZAP Baseline): `1 informational alert`, `0 Low`, `0 Medium`, `0 High`
+- Current remaining DAST alert context:
+  - `Non-Storable Content` (informational)
 
 ### Security scan artifacts
 
 - `semgrep-report.json`
+- `semgrep-after-custom.json`
 - `zap-report.json`
 - `zap-report.html`
+- `report_json.json`
+- `report_md.md`
+- `report_html.html`
 
-## CI/CD Security Draft
+## CI/CD Security Pipelines (Implemented)
 
-Workflow file:
-- `.github/workflows/security-ci.yml`
+Workflow files:
+- `.github/workflows/sast.yaml`
+- `.github/workflows/dast.yaml`
 
-Pipeline stages included:
-1. Push / pull request trigger
+### SAST workflow (`sast.yaml`)
+1. Trigger on `push` / `pull_request` to `main` and team branch
+2. Build and unit tests (`./mvnw clean install -DskipTests`, then `./mvnw -B test`)
+3. SonarCloud analysis with quality gate wait enabled
+4. Optional Trivy filesystem scan (`CRITICAL,HIGH`) with artifact upload
+5. SAST gate decision: required SAST job must pass; Trivy remains warning-only
+
+### DAST workflow (`dast.yaml`)
+1. Trigger on `push` / `pull_request` to `main` and team branch
 2. Build and unit tests
-3. Secret and configuration hygiene checks
-4. SAST scan with Semgrep
-5. Optional dependency / container scan with Trivy
-6. Start application in a controlled test environment
-7. DAST baseline scan with OWASP ZAP
-8. Security gate decision (pass/fail)
+3. Start app and check readiness (`/swagger-ui/index.html`)
+4. Run OWASP ZAP baseline scan in Docker
+5. Parse JSON results and fail if any `Medium`/`High` alert is found
+6. Upload ZAP artifacts and stop app
 
 ### Security gate principle
 Any failed required security stage should block the merge or release candidate until the issue is reviewed and resolved.
@@ -235,6 +270,11 @@ This project uses H2 and local HTTP for development/demo simplicity. In a produc
 - Apply dependency and container scanning in CI/CD
 - Add rate limiting and monitoring/alerting for sensitive endpoints
 - Restrict CORS and review security headers for deployment context
+
+## Scope Note
+
+This repository reflects the latest code and security-report update.
+Presentation slides and live demo materials may reference an earlier project snapshot.
 
 ## Contributors
 - Devkumar Parikshit GANDHI
